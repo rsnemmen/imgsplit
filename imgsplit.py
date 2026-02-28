@@ -124,6 +124,16 @@ def main():
         page.save(out_path, format="PNG")
         print(f"  [{i:>{len(str(len(pages)))}}/{len(pages)}] {out_path.name}")
 
+    pdf_path = out_dir / f"{prefix}.pdf"
+    pages[0].save(
+        pdf_path,
+        format="PDF",
+        save_all=True,
+        append_images=pages[1:],
+        resolution=args.dpi,
+    )
+    print(f"PDF:            {pdf_path.name}")
+
     print(f"\nDone — {len(pages)} page(s) written.")
 
 

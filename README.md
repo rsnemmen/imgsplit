@@ -28,12 +28,13 @@ python3 imgsplit.py [options] input
 
 ### Output
 
-Pages are written as numbered PNG files:
+Pages are written as numbered PNG files alongside a single multi-page PDF:
 
 ```
 {prefix}_001.png
 {prefix}_002.png
 ...
+{prefix}.pdf
 ```
 
 The last page is padded with white if the image does not fill it completely.
