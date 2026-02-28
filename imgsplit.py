@@ -123,10 +123,14 @@ def main():
     prefix = args.prefix if args.prefix else input_path.stem
 
     print(f"Output:         {out_dir}/")
+    n = len(pages)
     for i, page in enumerate(pages, start=1):
         out_path = out_dir / f"{prefix}_{i:03d}.png"
         page.save(out_path, format="PNG")
-        print(f"  [{i:>{len(str(len(pages)))}}/{len(pages)}] {out_path.name}")
+        filled = round(30 * i / n)
+        bar = "█" * filled + "░" * (30 - filled)
+        print(f"\r  [{bar}] {i}/{n}", end="", flush=True)
+    print()
 
     if args.images_only:
         print(f"\nDone — {len(pages)} PNG(s) written.")
