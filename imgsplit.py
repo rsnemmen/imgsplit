@@ -25,8 +25,8 @@ def parse_args():
     )
     parser.add_argument("input", help="Input JPEG or PNG file")
     parser.add_argument(
-        "--format", dest="page_format", choices=["A4", "Letter"], default="A4",
-        help="Page format (default: A4)",
+        "--format", dest="page_format", choices=["A4", "Letter"], default="Letter",
+        help="Page format (default: Letter)",
     )
     parser.add_argument(
         "--dpi", type=int, default=150,
