@@ -44,6 +44,10 @@ def parse_args():
         "--prefix", default=None,
         help="Output filename prefix (default: input filename stem)",
     )
+    parser.add_argument(
+        "--images-only", action="store_true",
+        help="Save individual page PNGs instead of a combined PDF (PNGs are deleted by default)",
+    )
     return parser.parse_args()
 
 
@@ -124,17 +128,21 @@ def main():
         page.save(out_path, format="PNG")
         print(f"  [{i:>{len(str(len(pages)))}}/{len(pages)}] {out_path.name}")
 
-    pdf_path = out_dir / f"{prefix}.pdf"
-    pages[0].save(
-        pdf_path,
-        format="PDF",
-        save_all=True,
-        append_images=pages[1:],
-        resolution=args.dpi,
-    )
-    print(f"PDF:            {pdf_path.name}")
-
-    print(f"\nDone — {len(pages)} page(s) written.")
+    if args.images_only:
+        print(f"\nDone — {len(pages)} PNG(s) written.")
+    else:
+        pdf_path = out_dir / f"{prefix}.pdf"
+        pages[0].save(
+            pdf_path,
+            format="PDF",
+            save_all=True,
+            append_images=pages[1:],
+            resolution=args.dpi,
+        )
+        print(f"PDF:            {pdf_path.name}")
+        for i in range(1, len(pages) + 1):
+            (out_dir / f"{prefix}_{i:03d}.png").unlink()
+        print(f"\nDone — {len(pages)}-page PDF written.")
 
 
 if __name__ == "__main__":

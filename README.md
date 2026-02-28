@@ -25,16 +25,22 @@ python3 imgsplit.py [options] input
 | `--margin MM` | `10` | Margin on each side in mm |
 | `--output DIR` | input file's directory | Directory to write output files |
 | `--prefix NAME` | input filename stem | Prefix for output filenames |
+| `--images-only` | off | Save numbered PNGs instead of a PDF |
 
 ### Output
 
-Pages are written as numbered PNG files alongside a single multi-page PDF:
+By default a single multi-page PDF is produced and the intermediate PNGs are removed:
+
+```
+{prefix}.pdf
+```
+
+With `--images-only`, numbered PNGs are saved instead and no PDF is created:
 
 ```
 {prefix}_001.png
 {prefix}_002.png
 ...
-{prefix}.pdf
 ```
 
 The last page is padded with white if the image does not fill it completely.
@@ -53,6 +59,9 @@ python3 imgsplit.py screenshot.png --margin 0
 
 # Write pages to a subdirectory with a custom prefix
 python3 imgsplit.py screenshot.png --output ./pages --prefix slide
+
+# Keep individual PNGs instead of producing a PDF
+python3 imgsplit.py screenshot.png --images-only
 ```
 
 ### Sample output
@@ -65,8 +74,9 @@ Output:         ./
   [1/9] screenshot_001.png
   ...
   [9/9] screenshot_009.png
+PDF:            screenshot.pdf
 
-Done — 9 page(s) written.
+Done — 9-page PDF written.
 ```
 
 ## How it works
