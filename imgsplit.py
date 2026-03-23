@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """imgsplit.py — Split a tall image into page-sized slices for A4 or Letter printing."""
 
 import argparse
