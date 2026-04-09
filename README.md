@@ -1,6 +1,6 @@
 # imgsplit
 
-Split a tall JPEG or PNG image into page-sized slices ready for printing or embedding in A4 or Letter documents.
+Split a tall JPEG, PNG, or PDF into page-sized slices ready for printing or embedding in A4 or Letter documents.
 
 Scrolling screenshots and other vertically-stitched images are typically too tall to fit on a single page. `imgsplit` scales the image to fill the page width and cuts it into uniform slices, one per page.
 
@@ -8,6 +8,7 @@ Scrolling screenshots and other vertically-stitched images are typically too tal
 
 - Python 3.10+
 - [Pillow](https://python-pillow.org/) (`pip install Pillow`)
+- [PyMuPDF](https://pymupdf.readthedocs.io/) (`pip install PyMuPDF`) — only required for PDF input
 
 ## Usage
 
@@ -19,7 +20,7 @@ python3 imgsplit.py [options] input
 
 | Argument | Default | Description |
 |---|---|---|
-| `input` | — | Input JPEG or PNG file |
+| `input` | — | Input JPEG, PNG, or PDF file |
 | `--format {A4,Letter}` | `A4` | Page format |
 | `--dpi DPI` | `150` | Output resolution in DPI |
 | `--margin MM` | `10` | Margin on each side in mm |
@@ -84,6 +85,7 @@ Done — 9-page PDF written.
 1. The image is scaled so its width fills the printable area (page width minus margins).
 2. The scaled image is sliced into vertical strips, each one page tall.
 3. Transparent images (RGBA/PNG with alpha) are composited onto a white background before slicing.
+4. PDF inputs are rendered to a bitmap at the requested DPI; multi-page PDFs are stacked vertically into one tall image before slicing.
 
 ## Page dimensions reference
 

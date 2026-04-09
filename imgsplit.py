@@ -9,6 +9,11 @@ from pathlib import Path
 
 from PIL import Image
 
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
+
 PAGE_SIZES_MM = {
     "A4":     (210.0, 297.0),
     "Letter": (215.9, 279.4),
@@ -21,10 +26,10 @@ def mm_to_px(mm: float, dpi: int) -> int:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Split a tall JPEG/PNG image into page-sized slices.",
+        description="Split a tall JPEG/PNG/PDF into page-sized slices.",
     )
     parser.add_argument("inputs", nargs="+", metavar="input",
-                        help="Input JPEG or PNG file(s)")
+                        help="Input JPEG, PNG, or PDF file(s)")
     parser.add_argument(
         "--format", dest="page_format", choices=["A4", "Letter"], default="Letter",
         help="Page format (default: Letter)",
@@ -52,10 +57,81 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_image(path: str) -> Image.Image:
+def _detect_pdf_source_dpi(doc) -> float:
+    """Probe embedded bitmap density on page 0 to estimate the PDF's native DPI."""
+    try:
+        page = doc[0]
+        images = page.get_images(full=True)
+    except Exception:
+        return 0.0
+    best = 0.0
+    for img_info in images:
+        try:
+            bbox = page.get_image_bbox(img_info)
+        except Exception:
+            continue
+        if bbox.width <= 0 or bbox.height <= 0:
+            continue
+        img_w_px, img_h_px = img_info[2], img_info[3]
+        if img_w_px <= 0 or img_h_px <= 0:
+            continue
+        best = max(best, img_w_px * 72.0 / bbox.width, img_h_px * 72.0 / bbox.height)
+    return best
+
+
+def load_pdf(path: str, dpi: int) -> Image.Image:
+    """Render a PDF (single or multi-page) to a single tall RGB PIL image."""
+    if fitz is None:
+        raise ValueError(
+            "PDF input requires PyMuPDF. Install it with: pip install PyMuPDF"
+        )
+    try:
+        doc = fitz.open(path)
+    except FileNotFoundError:
+        raise ValueError(f"file not found: {path}")
+    except Exception as e:
+        raise ValueError(f"error opening PDF: {e}")
+
+    if doc.page_count == 0:
+        doc.close()
+        raise ValueError(f"PDF has no pages: {path}")
+
+    # Render at the output DPI, or the PDF's native bitmap DPI if higher (so
+    # embedded high-res bitmaps aren't thrown away before split_image sees them).
+    # Capped at 600 DPI to keep memory bounded on pathological inputs.
+    source_dpi = _detect_pdf_source_dpi(doc)
+    render_dpi = min(max(dpi, round(source_dpi)), 600)
+
+    zoom = render_dpi / 72.0  # PDF user-space unit is 1/72 inch
+    matrix = fitz.Matrix(zoom, zoom)
+    rendered = []
+    for page in doc:
+        pix = page.get_pixmap(matrix=matrix, alpha=False)
+        rendered.append(Image.frombytes("RGB", (pix.width, pix.height), pix.samples))
+    doc.close()
+
+    if len(rendered) == 1:
+        return rendered[0]
+
+    # Stack pages vertically, centering narrower pages on a white background
+    max_w = max(p.width for p in rendered)
+    total_h = sum(p.height for p in rendered)
+    combined = Image.new("RGB", (max_w, total_h), (255, 255, 255))
+    y = 0
+    for p in rendered:
+        combined.paste(p, ((max_w - p.width) // 2, y))
+        y += p.height
+    return combined
+
+
+def load_image(path: str, dpi: int) -> Image.Image:
     suffix = Path(path).suffix.lower()
+    if suffix == ".pdf":
+        return load_pdf(path, dpi)
     if suffix not in (".jpg", ".jpeg", ".png"):
-        raise ValueError(f"unsupported file type '{suffix}'. Only JPEG and PNG are accepted.")
+        raise ValueError(
+            f"unsupported file type '{suffix}'. Only JPEG, PNG, and PDF are accepted."
+        )
     try:
         img = Image.open(path)
     except FileNotFoundError:
@@ -102,7 +178,7 @@ def split_image(img: Image.Image, pw: int, ph: int) -> list[Image.Image]:
 def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
     """Process a single input file. Returns True on success, False on handled failure."""
     try:
-        img = load_image(input_path)
+        img = load_image(input_path, args.dpi)
     except ValueError as e:
         print(f"Error: {e}")
         return False
