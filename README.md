@@ -4,6 +4,10 @@ Split a tall JPEG, PNG, or PDF into page-sized slices ready for printing or embe
 
 Scrolling screenshots and other vertically-stitched images are typically too tall to fit on a single page. `imgsplit` scales the image to fill the page width and cuts it into uniform slices, one per page.
 
+| Original tall image | Split into printable PDF pages |
+|---|---|
+| <img src="imgs/SCR-20260409-jrpo.png" alt="Original long screenshot used as input" width="320"> | <img src="imgs/grid.jpg" alt="Output PDF pages arranged as a printable grid" width="320"> |
+
 ## Installation
 
 ```bash
