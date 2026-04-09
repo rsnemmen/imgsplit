@@ -23,7 +23,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Split a tall JPEG/PNG image into page-sized slices.",
     )
-    parser.add_argument("input", help="Input JPEG or PNG file")
+    parser.add_argument("inputs", nargs="+", metavar="input",
+                        help="Input JPEG or PNG file(s)")
     parser.add_argument(
         "--format", dest="page_format", choices=["A4", "Letter"], default="Letter",
         help="Page format (default: Letter)",
@@ -42,7 +43,7 @@ def parse_args():
     )
     parser.add_argument(
         "--prefix", default=None,
-        help="Output filename prefix (default: input filename stem)",
+        help="Output filename prefix (default: input filename stem; cannot be used with multiple inputs)",
     )
     parser.add_argument(
         "--images-only", action="store_true",
@@ -54,13 +55,13 @@ def parse_args():
 def load_image(path: str) -> Image.Image:
     suffix = Path(path).suffix.lower()
     if suffix not in (".jpg", ".jpeg", ".png"):
-        sys.exit(f"Error: unsupported file type '{suffix}'. Only JPEG and PNG are accepted.")
+        raise ValueError(f"unsupported file type '{suffix}'. Only JPEG and PNG are accepted.")
     try:
         img = Image.open(path)
     except FileNotFoundError:
-        sys.exit(f"Error: file not found: {path}")
+        raise ValueError(f"file not found: {path}")
     except Exception as e:
-        sys.exit(f"Error opening image: {e}")
+        raise ValueError(f"error opening image: {e}")
 
     # Flatten to RGB (handles RGBA, P, L, etc.) with a white background
     if img.mode != "RGB":
@@ -98,11 +99,63 @@ def split_image(img: Image.Image, pw: int, ph: int) -> list[Image.Image]:
     return pages
 
 
+def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
+    """Process a single input file. Returns True on success, False on handled failure."""
+    try:
+        img = load_image(input_path)
+    except ValueError as e:
+        print(f"Error: {e}")
+        return False
+
+    src_w, src_h = img.size
+    print(f"Input:          {input_path}  ({src_w} × {src_h} px)")
+    print(f"Page format:    {args.page_format}, {args.dpi} DPI, {args.margin} mm margin")
+    print(f"Printable area: {pw} × {ph} px")
+
+    pages = split_image(img, pw, ph)
+
+    in_path = Path(input_path)
+    out_dir = Path(args.output) if args.output else in_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Output:         {out_dir}/")
+    n = len(pages)
+    try:
+        for i, page in enumerate(pages, start=1):
+            out_path = out_dir / f"{prefix}_{i:03d}.png"
+            page.save(out_path, format="PNG")
+            filled = round(30 * i / n)
+            bar = "█" * filled + "░" * (30 - filled)
+            print(f"\r  [{bar}] {i}/{n}", end="", flush=True)
+        print()
+
+        if args.images_only:
+            print(f"\nDone — {len(pages)} PNG(s) written.")
+        else:
+            pdf_path = out_dir / f"{prefix}.pdf"
+            pages[0].save(
+                pdf_path,
+                format="PDF",
+                save_all=True,
+                append_images=pages[1:],
+                resolution=args.dpi,
+            )
+            print(f"PDF:            {pdf_path.name}")
+            for i in range(1, len(pages) + 1):
+                (out_dir / f"{prefix}_{i:03d}.png").unlink()
+            print(f"\nDone — {len(pages)}-page PDF written.")
+    except OSError as e:
+        print(f"\nError writing output: {e}")
+        return False
+
+    return True
+
+
 def main():
     args = parse_args()
 
-    img = load_image(args.input)
-    src_w, src_h = img.size
+    if len(args.inputs) > 1 and args.prefix is not None:
+        sys.exit("Error: --prefix cannot be used with multiple input files.")
 
     page_w_mm, page_h_mm = PAGE_SIZES_MM[args.page_format]
     pw = mm_to_px(page_w_mm - 2 * args.margin, args.dpi)
@@ -111,42 +164,28 @@ def main():
     if pw <= 0 or ph <= 0:
         sys.exit("Error: margin is too large — printable area is zero or negative.")
 
-    print(f"Input:          {args.input}  ({src_w} × {src_h} px)")
-    print(f"Page format:    {args.page_format}, {args.dpi} DPI, {args.margin} mm margin")
-    print(f"Printable area: {pw} × {ph} px")
+    batch = len(args.inputs) > 1
+    n_total = len(args.inputs)
+    failures = 0
 
-    pages = split_image(img, pw, ph)
+    for idx, input_path in enumerate(args.inputs, start=1):
+        if batch:
+            print(f"=== [{idx}/{n_total}] {input_path} ===")
 
-    input_path = Path(args.input)
-    out_dir = Path(args.output) if args.output else input_path.parent
-    out_dir.mkdir(parents=True, exist_ok=True)
-    prefix = args.prefix if args.prefix else input_path.stem
+        prefix = args.prefix if args.prefix else Path(input_path).stem
+        ok = process_file(input_path, args, pw, ph, prefix)
+        if not ok:
+            failures += 1
 
-    print(f"Output:         {out_dir}/")
-    n = len(pages)
-    for i, page in enumerate(pages, start=1):
-        out_path = out_dir / f"{prefix}_{i:03d}.png"
-        page.save(out_path, format="PNG")
-        filled = round(30 * i / n)
-        bar = "█" * filled + "░" * (30 - filled)
-        print(f"\r  [{bar}] {i}/{n}", end="", flush=True)
-    print()
+        if batch and idx < n_total:
+            print()
 
-    if args.images_only:
-        print(f"\nDone — {len(pages)} PNG(s) written.")
-    else:
-        pdf_path = out_dir / f"{prefix}.pdf"
-        pages[0].save(
-            pdf_path,
-            format="PDF",
-            save_all=True,
-            append_images=pages[1:],
-            resolution=args.dpi,
-        )
-        print(f"PDF:            {pdf_path.name}")
-        for i in range(1, len(pages) + 1):
-            (out_dir / f"{prefix}_{i:03d}.png").unlink()
-        print(f"\nDone — {len(pages)}-page PDF written.")
+    if batch:
+        succeeded = n_total - failures
+        print(f"\nBatch complete — {succeeded}/{n_total} succeeded.")
+
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
