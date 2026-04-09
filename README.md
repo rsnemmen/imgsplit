@@ -4,16 +4,22 @@ Split a tall JPEG, PNG, or PDF into page-sized slices ready for printing or embe
 
 Scrolling screenshots and other vertically-stitched images are typically too tall to fit on a single page. `imgsplit` scales the image to fill the page width and cuts it into uniform slices, one per page.
 
-## Requirements
+## Installation
 
-- Python 3.10+
-- [Pillow](https://python-pillow.org/) (`pip install Pillow`)
-- [PyMuPDF](https://pymupdf.readthedocs.io/) (`pip install PyMuPDF`) — only required for PDF input
+```bash
+curl -fsSL https://raw.githubusercontent.com/rsnemmen/imgsplit/main/install.sh | bash
+```
+
+Installs into `~/.local/share/imgsplit` with a wrapper at `~/.local/bin/imgsplit`. Requires Python 3.10+.
+
+Re-run the same command to upgrade.
+
+Uninstall: `rm -rf ~/.local/share/imgsplit ~/.local/bin/imgsplit`
 
 ## Usage
 
 ```
-python3 imgsplit.py [options] input
+imgsplit [options] input
 ```
 
 ### Arguments
@@ -50,19 +56,19 @@ The last page is padded with white if the image does not fill it completely.
 
 ```bash
 # Default: A4, 150 DPI, 10 mm margins
-python3 imgsplit.py screenshot.png
+imgsplit screenshot.png
 
 # Letter format at 300 DPI
-python3 imgsplit.py screenshot.png --format Letter --dpi 300
+imgsplit screenshot.png --format Letter --dpi 300
 
 # No margins
-python3 imgsplit.py screenshot.png --margin 0
+imgsplit screenshot.png --margin 0
 
 # Write pages to a subdirectory with a custom prefix
-python3 imgsplit.py screenshot.png --output ./pages --prefix slide
+imgsplit screenshot.png --output ./pages --prefix slide
 
 # Keep individual PNGs instead of producing a PDF
-python3 imgsplit.py screenshot.png --images-only
+imgsplit screenshot.png --images-only
 ```
 
 ### Sample output
