@@ -96,7 +96,7 @@ Output:         ./
   [1/9] screenshot_001.png
   ...
   [9/9] screenshot_009.png
-OCR:            adding searchable text layer
+OCR:            [██████████████████████████████] 9/9
 PDF:            screenshot.pdf
 
 Done — 9-page PDF written.

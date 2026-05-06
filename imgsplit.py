@@ -211,8 +211,12 @@ def save_ocr_pdf(
         raise ValueError("OCR PDF output requires a PyMuPDF build with Tesseract OCR support.")
 
     out_doc = fitz.open()
+    n_pages = len(page_paths)
+    filled = 0
+    bar = "█" * filled + "░" * (30 - filled)
+    print(f"\rOCR:            [{bar}] 0/{n_pages}", end="", flush=True)
     try:
-        for page_path in page_paths:
+        for i, page_path in enumerate(page_paths, start=1):
             pix = fitz.Pixmap(page_path)
             pix.set_dpi(dpi, dpi)
             page_pdf = fitz.open(
@@ -223,6 +227,10 @@ def save_ocr_pdf(
                 out_doc.insert_pdf(page_pdf)
             finally:
                 page_pdf.close()
+            filled = round(30 * i / n_pages)
+            bar = "█" * filled + "░" * (30 - filled)
+            print(f"\rOCR:            [{bar}] {i}/{n_pages}", end="", flush=True)
+        print()
         out_doc.save(pdf_path)
     finally:
         out_doc.close()
@@ -267,7 +275,6 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
             if args.no_ocr:
                 save_image_only_pdf(pages, pdf_path, args.dpi)
             else:
-                print("OCR:            adding searchable text layer")
                 save_ocr_pdf(
                     page_paths,
                     pdf_path,
