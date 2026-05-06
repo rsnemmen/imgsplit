@@ -93,9 +93,9 @@ Input:          screenshot.png  (1560 × 19842 px)
 Page format:    Letter, 150 DPI, 10.0 mm margin
 Printable area: 1157 × 1532 px
 Output:         ./
-  [1/9] screenshot_001.png
+Pages:          [████░░░░░░░░░░░░░░░░░░░░░░░░░░] 1/9
   ...
-  [9/9] screenshot_009.png
+Pages:          [██████████████████████████████] 9/9
 OCR:            [██████████████████████████████] 9/9
 PDF:            screenshot.pdf
 

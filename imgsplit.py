@@ -18,9 +18,54 @@ PAGE_SIZES_MM = {
     "Letter": (215.9, 279.4),
 }
 
+LABEL_WIDTH = 16
+BAR_WIDTH = 30
+ANSI_COLORS = {
+    "cyan": "\033[36m",
+    "green": "\033[32m",
+    "magenta": "\033[35m",
+}
+ANSI_RESET = "\033[0m"
+
 
 def mm_to_px(mm: float, dpi: int) -> int:
     return round(mm / 25.4 * dpi)
+
+
+def supports_color() -> bool:
+    return sys.stdout.isatty()
+
+
+def color_text(text: str, color: str, enabled: bool) -> str:
+    if not enabled:
+        return text
+    return f"{ANSI_COLORS[color]}{text}{ANSI_RESET}"
+
+
+def label_text(label: str) -> str:
+    return f"{label}:".ljust(LABEL_WIDTH)
+
+
+def progress_bar(current: int, total: int, color: str | None, color_enabled: bool) -> str:
+    filled = round(BAR_WIDTH * current / total)
+    bar = "█" * filled + "░" * (BAR_WIDTH - filled)
+    if color is not None:
+        bar = color_text(bar, color, color_enabled)
+    return f"[{bar}] {current}/{total}"
+
+
+def print_progress(
+    label: str,
+    current: int,
+    total: int,
+    color: str | None,
+    color_enabled: bool,
+) -> None:
+    print(
+        f"\r{label_text(label)}{progress_bar(current, total, color, color_enabled)}",
+        end="",
+        flush=True,
+    )
 
 
 def parse_args():
@@ -202,6 +247,7 @@ def save_ocr_pdf(
     dpi: int,
     language: str,
     tessdata: str | None,
+    color_enabled: bool,
 ) -> None:
     if fitz is None:
         raise ValueError(
@@ -212,9 +258,7 @@ def save_ocr_pdf(
 
     out_doc = fitz.open()
     n_pages = len(page_paths)
-    filled = 0
-    bar = "█" * filled + "░" * (30 - filled)
-    print(f"\rOCR:            [{bar}] 0/{n_pages}", end="", flush=True)
+    print_progress("OCR", 0, n_pages, "magenta", color_enabled)
     try:
         for i, page_path in enumerate(page_paths, start=1):
             pix = fitz.Pixmap(page_path)
@@ -227,9 +271,7 @@ def save_ocr_pdf(
                 out_doc.insert_pdf(page_pdf)
             finally:
                 page_pdf.close()
-            filled = round(30 * i / n_pages)
-            bar = "█" * filled + "░" * (30 - filled)
-            print(f"\rOCR:            [{bar}] {i}/{n_pages}", end="", flush=True)
+            print_progress("OCR", i, n_pages, "magenta", color_enabled)
         print()
         out_doc.save(pdf_path)
     finally:
@@ -245,9 +287,11 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
         return False
 
     src_w, src_h = img.size
-    print(f"Input:          {input_path}  ({src_w} × {src_h} px)")
-    print(f"Page format:    {args.page_format}, {args.dpi} DPI, {args.margin} mm margin")
-    print(f"Printable area: {pw} × {ph} px")
+    color_enabled = supports_color()
+    input_display = color_text(input_path, "cyan", color_enabled)
+    print(f"{label_text('Input')}{input_display}  ({src_w} × {src_h} px)")
+    print(f"{label_text('Page format')}{args.page_format}, {args.dpi} DPI, {args.margin} mm margin")
+    print(f"{label_text('Printable area')}{pw} × {ph} px")
 
     pages = split_image(img, pw, ph)
 
@@ -255,7 +299,8 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
     out_dir = Path(args.output) if args.output else in_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Output:         {out_dir}/")
+    output_display = color_text(f"{out_dir}/", "green", color_enabled)
+    print(f"{label_text('Output')}{output_display}")
     n = len(pages)
     page_paths = []
     try:
@@ -263,9 +308,7 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
             out_path = out_dir / f"{prefix}_{i:03d}.png"
             page.save(out_path, format="PNG")
             page_paths.append(out_path)
-            filled = round(30 * i / n)
-            bar = "█" * filled + "░" * (30 - filled)
-            print(f"\r  [{bar}] {i}/{n}", end="", flush=True)
+            print_progress("Pages", i, n, None, color_enabled)
         print()
 
         if args.images_only:
@@ -281,8 +324,10 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
                     args.dpi,
                     args.ocr_lang,
                     args.ocr_tessdata,
+                    color_enabled,
                 )
-            print(f"PDF:            {pdf_path.name}")
+            pdf_display = color_text(pdf_path.name, "green", color_enabled)
+            print(f"{label_text('PDF')}{pdf_display}")
             for page_path in page_paths:
                 page_path.unlink()
             print(f"\nDone — {len(pages)}-page PDF written.")
