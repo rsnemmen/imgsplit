@@ -90,8 +90,8 @@ imgsplit screenshot.png --images-only
 
 ```
 Input:          screenshot.png  (1560 × 19842 px)
-Page format:    A4, 150 DPI, 10.0 mm margin
-Printable area: 1122 × 1636 px
+Page format:    Letter, 150 DPI, 10.0 mm margin
+Printable area: 1157 × 1532 px
 Output:         ./
   [1/9] screenshot_001.png
   ...
