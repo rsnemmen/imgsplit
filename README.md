@@ -14,7 +14,7 @@ Scrolling screenshots and other vertically-stitched images are typically too tal
 curl -fsSL https://raw.githubusercontent.com/rsnemmen/imgsplit/main/install.sh | bash
 ```
 
-Installs into `~/.local/share/imgsplit` with a wrapper at `~/.local/bin/imgsplit`. Requires Python 3.10+.
+Installs into `~/.local/share/imgsplit` with a wrapper at `~/.local/bin/imgsplit`. Requires Python 3.10+ and Tesseract OCR.
 
 Re-run the same command to upgrade.
 
@@ -31,16 +31,19 @@ imgsplit [options] input
 | Argument | Default | Description |
 |---|---|---|
 | `input` | — | Input JPEG, PNG, or PDF file |
-| `--format {A4,Letter}` | `A4` | Page format |
+| `--format {A4,Letter}` | `Letter` | Page format |
 | `--dpi DPI` | `150` | Output resolution in DPI |
 | `--margin MM` | `10` | Margin on each side in mm |
 | `--output DIR` | input file's directory | Directory to write output files |
 | `--prefix NAME` | input filename stem | Prefix for output filenames |
 | `--images-only` | off | Save numbered PNGs instead of a PDF |
+| `--no-ocr` | off | Produce an image-only PDF instead of a searchable OCR PDF |
+| `--ocr-lang LANG` | `eng` | Tesseract OCR language code(s), such as `eng` or `eng+deu` |
+| `--ocr-tessdata DIR` | auto-detect | Directory containing Tesseract language data |
 
 ### Output
 
-By default a single multi-page PDF is produced and the intermediate PNGs are removed:
+By default a single multi-page PDF is produced with a searchable/selectable OCR text layer, and the intermediate PNGs are removed:
 
 ```
 {prefix}.pdf
@@ -56,14 +59,22 @@ With `--images-only`, numbered PNGs are saved instead and no PDF is created:
 
 The last page is padded with white if the image does not fill it completely.
 
+If OCR fails, the command reports the error and keeps the intermediate PNGs for inspection. Use `--no-ocr` when you need the previous faster image-only PDF behavior.
+
 ## Examples
 
 ```bash
-# Default: A4, 150 DPI, 10 mm margins
+# Default: Letter, 150 DPI, 10 mm margins
 imgsplit screenshot.png
 
 # Letter format at 300 DPI
 imgsplit screenshot.png --format Letter --dpi 300
+
+# Produce an image-only PDF without OCR
+imgsplit screenshot.png --no-ocr
+
+# Use another installed Tesseract language
+imgsplit screenshot.png --ocr-lang eng+deu
 
 # No margins
 imgsplit screenshot.png --margin 0
@@ -85,6 +96,7 @@ Output:         ./
   [1/9] screenshot_001.png
   ...
   [9/9] screenshot_009.png
+OCR:            adding searchable text layer
 PDF:            screenshot.pdf
 
 Done — 9-page PDF written.
@@ -95,7 +107,8 @@ Done — 9-page PDF written.
 1. The image is scaled so its width fills the printable area (page width minus margins).
 2. The scaled image is sliced into vertical strips, each one page tall.
 3. Transparent images (RGBA/PNG with alpha) are composited onto a white background before slicing.
-4. PDF inputs are rendered to a bitmap at the requested DPI; multi-page PDFs are stacked vertically into one tall image before slicing.
+4. By default, each page image is OCRed with Tesseract and merged into a searchable PDF.
+5. PDF inputs are rendered to a bitmap at the requested DPI; multi-page PDFs are stacked vertically into one tall image before slicing.
 
 ## Page dimensions reference
 

@@ -3,7 +3,6 @@
 
 import argparse
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -53,6 +52,18 @@ def parse_args():
     parser.add_argument(
         "--images-only", action="store_true",
         help="Save individual page PNGs instead of a combined PDF (PNGs are deleted by default)",
+    )
+    parser.add_argument(
+        "--no-ocr", action="store_true",
+        help="Produce an image-only PDF instead of the default searchable OCR PDF",
+    )
+    parser.add_argument(
+        "--ocr-lang", default="eng",
+        help="Tesseract OCR language code(s), e.g. eng or eng+deu (default: eng)",
+    )
+    parser.add_argument(
+        "--ocr-tessdata", metavar="DIR", default=None,
+        help="Directory containing Tesseract language data (default: auto-detect)",
     )
     return parser.parse_args()
 
@@ -175,6 +186,48 @@ def split_image(img: Image.Image, pw: int, ph: int) -> list[Image.Image]:
     return pages
 
 
+def save_image_only_pdf(pages: list[Image.Image], pdf_path: Path, dpi: int) -> None:
+    pages[0].save(
+        pdf_path,
+        format="PDF",
+        save_all=True,
+        append_images=pages[1:],
+        resolution=dpi,
+    )
+
+
+def save_ocr_pdf(
+    page_paths: list[Path],
+    pdf_path: Path,
+    dpi: int,
+    language: str,
+    tessdata: str | None,
+) -> None:
+    if fitz is None:
+        raise ValueError(
+            "OCR PDF output requires PyMuPDF. Install it with: pip install PyMuPDF"
+        )
+    if not hasattr(fitz.Pixmap, "pdfocr_tobytes"):
+        raise ValueError("OCR PDF output requires a PyMuPDF build with Tesseract OCR support.")
+
+    out_doc = fitz.open()
+    try:
+        for page_path in page_paths:
+            pix = fitz.Pixmap(page_path)
+            pix.set_dpi(dpi, dpi)
+            page_pdf = fitz.open(
+                "pdf",
+                pix.pdfocr_tobytes(language=language, tessdata=tessdata),
+            )
+            try:
+                out_doc.insert_pdf(page_pdf)
+            finally:
+                page_pdf.close()
+        out_doc.save(pdf_path)
+    finally:
+        out_doc.close()
+
+
 def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
     """Process a single input file. Returns True on success, False on handled failure."""
     try:
@@ -196,10 +249,12 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
 
     print(f"Output:         {out_dir}/")
     n = len(pages)
+    page_paths = []
     try:
         for i, page in enumerate(pages, start=1):
             out_path = out_dir / f"{prefix}_{i:03d}.png"
             page.save(out_path, format="PNG")
+            page_paths.append(out_path)
             filled = round(30 * i / n)
             bar = "█" * filled + "░" * (30 - filled)
             print(f"\r  [{bar}] {i}/{n}", end="", flush=True)
@@ -209,19 +264,33 @@ def process_file(input_path: str, args, pw: int, ph: int, prefix: str) -> bool:
             print(f"\nDone — {len(pages)} PNG(s) written.")
         else:
             pdf_path = out_dir / f"{prefix}.pdf"
-            pages[0].save(
-                pdf_path,
-                format="PDF",
-                save_all=True,
-                append_images=pages[1:],
-                resolution=args.dpi,
-            )
+            if args.no_ocr:
+                save_image_only_pdf(pages, pdf_path, args.dpi)
+            else:
+                print("OCR:            adding searchable text layer")
+                save_ocr_pdf(
+                    page_paths,
+                    pdf_path,
+                    args.dpi,
+                    args.ocr_lang,
+                    args.ocr_tessdata,
+                )
             print(f"PDF:            {pdf_path.name}")
-            for i in range(1, len(pages) + 1):
-                (out_dir / f"{prefix}_{i:03d}.png").unlink()
+            for page_path in page_paths:
+                page_path.unlink()
             print(f"\nDone — {len(pages)}-page PDF written.")
     except OSError as e:
         print(f"\nError writing output: {e}")
+        return False
+    except ValueError as e:
+        print(f"\nError: {e}")
+        if page_paths and not args.images_only:
+            print("Intermediate PNGs were kept for inspection.")
+        return False
+    except Exception as e:
+        print(f"\nError creating OCR PDF: {e}")
+        if page_paths and not args.images_only and not args.no_ocr:
+            print("Intermediate PNGs were kept for inspection.")
         return False
 
     return True

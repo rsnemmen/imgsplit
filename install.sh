@@ -36,12 +36,17 @@ main() {
 
 require_cmd() {
   local missing=0
-  for cmd in python3 curl; do
+  for cmd in python3 curl tesseract; do
     if ! command -v "$cmd" > /dev/null 2>&1; then
       printf 'Error: %s not found. Please install it and re-run.\n' "$cmd" >&2
       missing=1
     fi
   done
+  if ! command -v tesseract > /dev/null 2>&1; then
+    printf '  Tesseract is required for searchable PDF output.\n' >&2
+    printf '  macOS: brew install tesseract\n' >&2
+    printf '  Debian/Ubuntu: sudo apt install tesseract-ocr\n' >&2
+  fi
   [ "$missing" -eq 0 ] || exit 1
 }
 
